@@ -17,6 +17,13 @@ let generating = false;
 let lastGenAt = 0;
 const MIN_INTERVAL_MS = 2000;
 
++const hasMediaAccessAPI = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
++async function ensureMicPermission() {
++  if (!hasMediaAccessAPI) return true;
++  try { await navigator.mediaDevices.getUserMedia({ audio: true }); return true; }
++  catch (e) { showToast('Microphone permission denied.'); return false; }
++}
+
 function showStatus(text) { els.status.textContent = text; }
 function showToast(text) {
   els.toast.textContent = text; els.toast.classList.add('show');
@@ -117,6 +124,7 @@ function setupRecognition() {
   if (!SR) {
     showToast('SpeechRecognition not supported in this browser.');
     els.micBtn.disabled = true;
++    showStatus('Unavailable: use Chrome desktop or Android');
     return;
   }
   recognition = new SR();
@@ -152,23 +160,27 @@ function setupRecognition() {
   };
 }
 // ...existing code...
-function toggleMic() {
-  if (!recognition) { setupRecognition(); }
-  if (!recognition) return;
-  if (listening) {
-    recognition.stop();
-  } else {
-    try {
-      finalText = ''; interim = '';
-      els.transcript.textContent = '';
-      recognition.start();
-    } catch (_) {
-      // Safari might throw if already started
-    }
-  }
-}
-// ...existing code...
-els.micBtn.addEventListener('click', toggleMic);
++async function toggleMic() {
++  if (!recognition) { setupRecognition(); }
++  if (!recognition) return;
++  if (listening) {
++    recognition.stop();
++  } else {
++    try {
++      finalText = ''; interim = '';
++      els.transcript.textContent = '';
++      if (!(await ensureMicPermission())) return;
++      recognition.start();
++    } catch (_) {
++      // Safari might throw if already started
++    }
++  }
++}
+
+/* ...existing code... */
+-els.micBtn.addEventListener('click', toggleMic);
++els.micBtn.addEventListener('click', () => { toggleMic(); });
+/* ...existing code... */
 els.clearBtn.addEventListener('click', () => {
   els.transcript.textContent = '';
   els.prompt.textContent = '';
@@ -182,5 +194,3 @@ window.addEventListener('keydown', (e) => {
 // ...existing code...
 setupRecognition();
 showStatus('Idle — press Space or click Start Listening');
-// ...existing code...
-
